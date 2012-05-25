@@ -1,21 +1,72 @@
 """Definition of the SCALDS content type
 """
+from xml.etree.ElementTree import Element, SubElement
+from xml.etree.ElementTree import tostring
 
 from zope.interface import implements
+
+from AccessControl import ClassSecurityInfo
 
 from Products.Archetypes import atapi
 from Products.ATContentTypes.content import base
 from Products.ATContentTypes.content import schemata
 
+from archetypes.referencebrowserwidget import ReferenceBrowserWidget
+
 # -*- Message Factory Imported Here -*-
 from leam.scalds import scaldsMessageFactory as _
 
 from leam.scalds.interfaces import ISCALDS
+from leam.luc.interfaces import IModel
 from leam.scalds.config import PROJECTNAME
 
 SCALDSSchema = schemata.ATContentTypeSchema.copy() + atapi.Schema((
 
     # -*- Your Archetypes field definitions here ... -*-
+
+    atapi.ReferenceField(
+        'scenario',
+        storage=atapi.AnnotationStorage(),
+        widget=ReferenceBrowserWidget(
+            label=_(u"LUC Scenario"),
+            description=_(u"The LUC scenario that will provide spatialized inputs to the SCALDS model."),
+            startup_directory='/luc/scenarios',
+        ),
+        required=True,
+        relationship='scalds_scenario',
+        allowed_types=('LUC Scenario'),
+        multiValued=False,
+    ),
+
+
+    atapi.ReferenceField(
+        'vmt',
+        storage=atapi.AnnotationStorage(),
+        widget=ReferenceBrowserWidget(
+            label=_(u"VMT Map"),
+            description=_(u"A vector map with the daily average VMT per household/employee per area."),
+            startup_directory='/luc/impacts/scalds/vmt',
+        ),
+        required=True,
+        relationship='scalds_vmt',
+        allowed_types=('SimMap'),
+        multiValued=False,
+    ),
+
+
+    atapi.ReferenceField(
+        'water',
+        storage=atapi.AnnotationStorage(),
+        widget=ReferenceBrowserWidget(
+            label=_(u"Water and Sewer Costs"),
+            description=_(u"A vector map providing costs associated with households/employees by area."),
+            startup_directory='/luc/impacts/scalds/water',
+        ),
+        relationship='scalds_water',
+        allowed_types=('SimMap'),
+        multiValued=False,
+    ),
+
 
     atapi.DateTimeField(
         'end_time',
@@ -23,6 +74,7 @@ SCALDSSchema = schemata.ATContentTypeSchema.copy() + atapi.Schema((
         widget=atapi.CalendarWidget(
             label=_(u"Model End Time"),
             description=_(u"Logs when model ends execution."),
+            visible={'view': 'hidden', 'edit': 'hidden'},
         ),
         validators=('isValidDate'),
     ),
@@ -34,6 +86,7 @@ SCALDSSchema = schemata.ATContentTypeSchema.copy() + atapi.Schema((
         widget=atapi.CalendarWidget(
             label=_(u"Model Start Time"),
             description=_(u"Logs when the model begins execution."),
+            visible={'view': 'hidden', 'edit': 'hidden'},
         ),
         validators=('isValidDate'),
     ),
@@ -45,52 +98,11 @@ SCALDSSchema = schemata.ATContentTypeSchema.copy() + atapi.Schema((
         widget=atapi.StringWidget(
             label=_(u"Model Run Status"),
             description=_(u"Maintain the state of the job."),
+            visible={'view': 'hidden', 'edit': 'hidden'},
         ),
         required=True,
         default=_(u"queued"),
     ),
-
-
-    atapi.ReferenceField(
-        'water',
-        storage=atapi.AnnotationStorage(),
-        widget=atapi.ReferenceBrowserWidget(
-            label=_(u"Water and Sewer Costs"),
-            description=_(u"A vector map providing costs associated with households/employees by area."),
-        ),
-        relationship='scalds_water',
-        allowed_types=(), # specify portal type names here ('Example Type',)
-        multiValued=False,
-    ),
-
-
-    atapi.ReferenceField(
-        'vmt',
-        storage=atapi.AnnotationStorage(),
-        widget=atapi.ReferenceBrowserWidget(
-            label=_(u"VMT Map"),
-            description=_(u"A vector map with the daily average VMT per household/employee per area."),
-        ),
-        required=True,
-        relationship='scalds_vmt',
-        allowed_types=(), # specify portal type names here ('Example Type',)
-        multiValued=False,
-    ),
-
-
-    atapi.ReferenceField(
-        'scenario',
-        storage=atapi.AnnotationStorage(),
-        widget=atapi.ReferenceBrowserWidget(
-            label=_(u"LUC Scenario"),
-            description=_(u"The LUC scenario that will provide spatialized inputs to the SCALDS model."),
-        ),
-        required=True,
-        relationship='scalds_scenario',
-        allowed_types=(), # specify portal type names here ('Example Type',)
-        multiValued=False,
-    ),
-
 
 ))
 
@@ -105,26 +117,83 @@ schemata.finalizeATCTSchema(SCALDSSchema, moveDiscussion=False)
 
 class SCALDS(base.ATCTContent):
     """Interface to the SCALDS Model."""
-    implements(ISCALDS)
+    implements(ISCALDS, IModel)
 
     meta_type = "SCALDS"
     schema = SCALDSSchema
+    security = ClassSecurityInfo()
 
     title = atapi.ATFieldProperty('title')
     description = atapi.ATFieldProperty('description')
 
     # -*- Your ATSchema to Python Property Bridges Here ... -*-
+
+    scenario = atapi.ATReferenceFieldProperty('scenario')
+
+    vmt = atapi.ATReferenceFieldProperty('vmt')
+
+    water = atapi.ATReferenceFieldProperty('water')
+
     end_time = atapi.ATFieldProperty('end_time')
 
     start_time = atapi.ATFieldProperty('start_time')
 
     runstatus = atapi.ATFieldProperty('runstatus')
 
-    water = atapi.ATReferenceFieldProperty('water')
+    security.declarePublic('requeue')
+    def requeue(self):
+        """simple method to requeue the scenario"""
+        self.runstatus = 'queued'
+        self.reindexObject(['runstatus',])
+        return "requeue"
 
-    vmt = atapi.ATReferenceFieldProperty('vmt')
 
-    scenario = atapi.ATReferenceFieldProperty('scenario')
+    security.declarePublic('end_run')
+    def end_run(self):
+        """Mark the run as complete, set the end time, and set default
+        page to summary.  
+
+        NEEDS WORK -- should set the endtime field, should set the
+        default page to the summary doc, should pass an arg that
+        selects 'complete' or 'terminated'.
+        """
+        self.runstatus = 'complete'
+        self.reindexObject(['runstatus',])
+
+        #self.setDefaultPage(obj)
+        return
+
+    security.declarePublic('getConfig')
+    def getConfig(self):
+        """Returns the cconfiguration necessary for running the model"""
+        #import pdb; pdb.set_trace()
+
+        model = Element('model')
+        tree = SubElement(model, 'scenario')
+        SubElement(tree, 'id').text = self.id
+        SubElement(tree, 'title').text = self.title
+        SubElement(tree, 'repository').text = \
+            'http://datacenter.leamgroup.com/svn/desktop/ccrpc_scalds/trunk'
+        SubElement(tree, 'cmdline').text = \
+            'python startup -c config.xml'
+
+        SubElement(tree, 'scenario').text = self.getScenario().absolute_url()
+
+        vmt = SubElement(tree, 'vmt')
+        SubElement(vmt, 'title').text = self.getVmt().title
+        SubElement(vmt, 'layer').text = self.getVmt().absolute_url() + \
+                '/at_download/simImage'
+
+        water = SubElement(tree, 'water')
+        SubElement(water, 'title').text = self.getWater().title
+        SubElement(vmt, 'layer').text = self.getWater().absolute_url() + \
+                '/at_download/simImage'
+
+        self.REQUEST.RESPONSE.setHeader('Content-Type',
+            'application/xml; charset=UTF-8')
+        self.REQUEST.RESPONSE.setHeader('Content-Disposition',
+            'attachment; filename="%s.xml"' % self.id)
+        return tostring(model, encoding='UTF-8')
 
 
 atapi.registerType(SCALDS, PROJECTNAME)
