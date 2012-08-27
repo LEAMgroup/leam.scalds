@@ -49,3 +49,10 @@ class ISCALDS(Interface):
         schema=Interface, # specify the interface(s) of the addable types here
     )
 #
+    template = schema.Object(
+        title=_(u"SCALDS Spreadsheet"),
+        required=True,
+        description=_(u"The SCALDS spreadsheet used as a template."),
+        schema=Interface, # specify the interface(s) of the addable types here
+    )
+#

@@ -25,6 +25,23 @@ SCALDSSchema = schemata.ATContentTypeSchema.copy() + atapi.Schema((
     # -*- Your Archetypes field definitions here ... -*-
 
     atapi.ReferenceField(
+        'template',
+        storage=atapi.AnnotationStorage(),
+        widget=ReferenceBrowserWidget(
+            label=_(u"SCALDS Spreadsheet"),
+            description=_(u"A SCALDS spreadsheet that will be used as a template."),
+            startup_directory='/luc/impacts/scalds',
+            allow_browse=True,
+            allow_search=True,
+        ),
+        required=True,
+        relationship='scalds_template',
+        allowed_types=('File', 'Document'),
+        multiValued=False,
+    ),
+
+
+    atapi.ReferenceField(
         'scenario',
         storage=atapi.AnnotationStorage(),
         widget=ReferenceBrowserWidget(
@@ -127,6 +144,7 @@ class SCALDS(base.ATCTContent):
     description = atapi.ATFieldProperty('description')
 
     # -*- Your ATSchema to Python Property Bridges Here ... -*-
+    template = atapi.ATReferenceFieldProperty('template')
 
     scenario = atapi.ATReferenceFieldProperty('scenario')
 
@@ -177,16 +195,25 @@ class SCALDS(base.ATCTContent):
         SubElement(tree, 'cmdline').text = \
             'python startup -c config.xml'
 
-        SubElement(tree, 'scenario').text = self.getScenario().absolute_url()
+        el = SubElement(tree, 'template')
+        SubElement(el, 'title').text = self.getTemplate().title
+        SubElement(el, 'download').text = self.getTemplate().absolute_url() + \
+                '/at_download/file'
 
-        vmt = SubElement(tree, 'vmt')
-        SubElement(vmt, 'title').text = self.getVmt().title
-        SubElement(vmt, 'layer').text = self.getVmt().absolute_url() + \
+        el = SubElement(tree, 'scenario')
+        SubElement(el, 'title').text = self.getScenario().title
+        SubElement(el, 'url').text = self.getScenario().absolute_url()
+        SubElement(el, 'config').text = self.getScenario().absolute_url() + \
+                '/getConfig'
+
+        el = SubElement(tree, 'vmt')
+        SubElement(el, 'title').text = self.getVmt().title
+        SubElement(el, 'download').text = self.getVmt().absolute_url() + \
                 '/at_download/simImage'
 
-        water = SubElement(tree, 'water')
-        SubElement(water, 'title').text = self.getWater().title
-        SubElement(vmt, 'layer').text = self.getWater().absolute_url() + \
+        el = SubElement(tree, 'water')
+        SubElement(el, 'title').text = self.getWater().title
+        SubElement(el, 'download').text = self.getWater().absolute_url() + \
                 '/at_download/simImage'
 
         self.REQUEST.RESPONSE.setHeader('Content-Type',
