@@ -191,7 +191,7 @@ class SCALDS(base.ATCTContent):
         SubElement(tree, 'id').text = self.id
         SubElement(tree, 'title').text = self.title
         SubElement(tree, 'repository').text = \
-            'http://datacenter.leamgroup.com/svn/desktop/ccrpc_scalds/trunk'
+            'http://svn.leamgroup.com/desktop/ccrpc_scalds/trunk'
         SubElement(tree, 'cmdline').text = \
             'python startup -c config.xml'
 
