@@ -22,7 +22,7 @@ long_description = (
     'Detailed Documentation\n'
     '**********************\n'
     + '\n' +
-    read('leam', 'scalds', 'README.txt')
+    read('leam', 'scalds', 'README.md')
     + '\n' +
     'Contributors\n'
     '************\n'
